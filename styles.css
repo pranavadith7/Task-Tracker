@@ -1,0 +1,91 @@
+/* .container {
+    display: flex;
+    justify-content: space-between;
+} */
+
+/* .column {
+    flex: 1;
+    min-width: 300px;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    margin-right: 20px;
+} */
+
+.task {
+    background-color: #fff;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    padding: 5px;
+    margin-bottom: 5px;
+    margin-top: 5px;
+    cursor: move;
+    display: flex;
+    flex-direction: column;
+    word-wrap: break-word;
+    max-width: 100%;
+}
+
+.task > * {
+    flex-shrink: 0;
+}
+
+.task .d-flex {
+    flex-shrink: 1;
+    flex-wrap: nowrap;
+}
+
+.task .badge {
+    flex-shrink: 0;
+    margin-right: 8px;
+}
+
+.task .badge i{
+    font-size: 1rem;
+}
+
+.task .delete-btn {
+    flex-shrink: 0;
+    margin-left: 8px;
+}
+
+.task.dragging {
+    opacity: 0.5;
+}
+
+.priority-icon {
+    font-size: 10px;
+    margin-left: 10px;
+}
+
+#new-task-form {
+    margin-top: 1rem;
+}
+
+/* #new-task-input {
+    border-right: 0;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+} */
+
+/* #new-task-input:focus {
+    box-shadow: none;
+}
+
+#new-task-form .btn {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+} */
+/* 
+#new-task-priority {
+    margin-left: 1rem;
+} */
+
+/* .custom-input-group-width .form-select {
+    width: 20%;
+}
+
+.custom-input-group-width .btn {
+    width: 20%;
+} */
