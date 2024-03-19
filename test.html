@@ -47,7 +47,19 @@
     <br>
     <div class="container">
         <div class="row">
-            <div class="col-4" id="todo-column">
+            <div class="col-3" id="backlog-column">
+                <h3 class="h6"><b>Backlog</b></h3>
+                <div class="list-group" id="backlog">
+                    <!-- <div class="list-group-item d-flex justify-content-between align-items-center task"
+                        draggable="true">
+                        Task 7
+                        <span class="badge bg-danger rounded-pill">
+                            <i class="bi bi-arrow-up-circle-fill"></i>
+                        </span>
+                    </div> -->
+                </div>
+            </div>
+            <div class="col-3" id="todo-column">
                 <h3 class="h6"><b>To-Do</b></h3>
                 <div class="list-group" id="todo">
                     <!-- <div class="list-group-item d-flex justify-content-between align-items-center task"
@@ -60,7 +72,7 @@
                 </div>
             </div>
 
-            <div class="col-4" id="in-progress-column">
+            <div class="col-3" id="in-progress-column">
                 <h3 class="h6"><b>In-Progress</b></h3>
                 <div class="list-group" id="inprogress">
                     <!-- 
@@ -73,7 +85,7 @@
                     </div> -->
                 </div>
             </div>
-            <div class="col-4" id="completed-column">
+            <div class="col-3" id="completed-column">
                 <h3 class="h6"><b>Completed</b></h3>
                 <div class="list-group" id="completed">
                     <!-- <div class="list-group-item d-flex justify-content-between align-items-center task"
@@ -131,7 +143,7 @@
             });
         });
 
-        const columns = document.querySelectorAll('.col-4');
+        const columns = document.querySelectorAll('.col-3');
 
         columns.forEach(column => {
             column.addEventListener('dragover', e => {
@@ -185,8 +197,8 @@
                 </span>
             `;
 
-            const todoList = document.getElementById('todo');
-            todoList.appendChild(newTask);
+            const backlogList = document.getElementById('backlog');
+            backlogList.appendChild(newTask);
 
             // Add event listeners for drag and drop
             addDragListeners(newTask);
@@ -208,7 +220,7 @@
 
             // Add the task to Firestore
             try {
-                await addDoc(collection(db, "todo"), {
+                await addDoc(collection(db, "backlog"), {
                     task: taskText,
                     priority: taskPriority
                 });
@@ -236,7 +248,7 @@
                 await console.log(docId);
                 await console.log(event.target.dataset);
                 await console.log(event.target);
-                document.getElementById('todo').innerHTML = '';
+                document.getElementById('backlog').innerHTML = '';
                 try {
                     // Delete the task document from Firestore
                     await deleteDoc(doc(db, collectionName, docId));
@@ -317,11 +329,19 @@
             });
         }
 
+        var backlogListDataElements = [];
         var todoListDataElements = [];
         var inProgressListDataElements = [];
         var completedListDataElements = [];
 
         function setTodoListElementsList() {
+
+            let backlogListElm = document.getElementById('backlog');
+            backlogListElm.innerHTML = '';
+            backlogListDataElements.forEach((taskElement) => {
+                backlogListElm.appendChild(taskElement);
+            });
+
             let todoListElm = document.getElementById('todo');
             todoListElm.innerHTML = '';
             todoListDataElements.forEach((taskElement) => {
@@ -344,10 +364,13 @@
 
         async function displayTodoList() {
             // debugger;
+            const backlogList = document.getElementById('backlog');
             const todoList = document.getElementById('todo');
             const inProgressList = document.getElementById('inprogress');
             const completedList = document.getElementById('completed');
 
+            // // Clear previous backlog list items
+            backlogList.innerHTML = '';
             // // Clear previous todo list items
             todoList.innerHTML = '';
             // // Clear previous in progress list items
@@ -356,6 +379,16 @@
             completedList.innerHTML = '';
 
             try {
+                const backlogQuerySnapshot = await getDocs(collection(db, "backlog"));
+                // console.log(todoList.children);
+                let tempBacklogElms = [];
+                backlogQuerySnapshot.forEach((doc) => {
+                    const taskData = doc.data();
+                    const taskElement = createTaskElement(taskData, doc.id, "backlog");
+                    tempBacklogElms.push(taskElement);
+                });
+                backlogListDataElements = [...tempBacklogElms];
+
                 const todoQuerySnapshot = await getDocs(collection(db, "todo"));
                 // console.log(todoList.children);
                 let tempTodoElms = [];
@@ -420,6 +453,7 @@
 
         // --------------------------------------------------
 
+        const BACKLOG_COLLECTION = 'backlog';
         const TODO_COLLECTION = 'todo';
         const IN_PROGRESS_COLLECTION = 'inprogress';
         const COMPLETED_COLLECTION = 'completed';
@@ -506,7 +540,7 @@
                 await console.log(event.target.dataset);
                 await console.log(event.target);
                 document.getElementById('todo').innerHTML = '';
-                console.log(document.getElementById('todo'));
+                // console.log(document.getElementById('todo'));
 
                 const collectionName = event.target.closest('.list-group').id;
                 try {
