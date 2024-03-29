@@ -26,6 +26,42 @@
     </nav>
     <br>
     <div class="container">
+        <h6>Add new Project</h6>
+    </div>
+    <br>
+    <div class="container">
+        <form id="new-project-form">
+            <div class="input-group mb-3 row">
+                <div class="col-10">
+                    <input type="text" class="form-control" id="new-project-input" placeholder="Add a new project...">
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-primary" type="submit">Add project</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <br>
+    <div class="container">
+        <h6>View Project tasks</h6>
+    </div>
+    <br>
+    <div class="container">
+        <form id="new-tasks-form">
+            <div class="input-group mb-3 row">
+                <div class="col-10">
+                    <select class="form-select" id="new-task-code" aria-label="Default select example">
+                    </select>
+                </div>
+                <div class="col-2">
+                    <button class="btn btn-primary" type="submit">View project tasks</button>
+                </div>
+            </div>
+        </form>
+    </div>
+    <br>
+    <hr><br>
+    <div class="container">
         <form id="new-task-form">
             <div class="input-group mb-3 row">
                 <div class="col-8">
@@ -104,7 +140,7 @@
     <script type="module">
         // Import the functions you need from the SDKs you need
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+        import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAj06OfnGYpMuuCkgfd8vdSqyJKeFhZFcU",
@@ -125,6 +161,9 @@
         window.addDoc = addDoc;
         window.getDoc = getDoc;
         window.deleteDoc = deleteDoc;
+        window.setDoc = setDoc;
+        window.query = query;
+        window.where = where;
 
 
         const tasks = document.querySelectorAll('.task');
@@ -217,12 +256,14 @@
             // Get the task text and priority from the input fields
             const taskText = newTaskInput.value.trim();
             const taskPriority = newTaskPriority.value;
+            const projectCode = document.getElementById('new-task-code').value;
 
             // Add the task to Firestore
             try {
                 await addDoc(collection(db, "backlog"), {
                     task: taskText,
-                    priority: taskPriority
+                    priority: taskPriority,
+                    id: projectCode
                 });
                 // Clear the input field after adding the task
                 newTaskInput.value = '';
@@ -363,6 +404,10 @@
 
 
         async function displayTodoList() {
+
+            const projectCode = document.getElementById('new-task-code').value;
+            // console.log(projectCode);
+
             // debugger;
             const backlogList = document.getElementById('backlog');
             const todoList = document.getElementById('todo');
@@ -379,7 +424,8 @@
             completedList.innerHTML = '';
 
             try {
-                const backlogQuerySnapshot = await getDocs(collection(db, "backlog"));
+                // const backlogQuerySnapshot = await getDocs(collection(db, "backlog"));
+                const backlogQuerySnapshot = await getDocs(query(collection(db, "backlog"), where("id", "==", projectCode)));
                 // console.log(todoList.children);
                 let tempBacklogElms = [];
                 backlogQuerySnapshot.forEach((doc) => {
@@ -389,7 +435,8 @@
                 });
                 backlogListDataElements = [...tempBacklogElms];
 
-                const todoQuerySnapshot = await getDocs(collection(db, "todo"));
+                // const todoQuerySnapshot = await getDocs(collection(db, "todo"));
+                const todoQuerySnapshot = await getDocs(query(collection(db, "todo"), where("id", "==", projectCode)));
                 // console.log(todoList.children);
                 let tempTodoElms = [];
                 todoQuerySnapshot.forEach((doc) => {
@@ -400,7 +447,8 @@
                 todoListDataElements = [...tempTodoElms];
 
 
-                const inProgressQuerySnapshot = await getDocs(collection(db, "inprogress"));
+                // const inProgressQuerySnapshot = await getDocs(collection(db, "inprogress"));
+                const inProgressQuerySnapshot = await getDocs(query(collection(db, "inprogress"), where("id", "==", projectCode)));
                 let tempinProgressElms = [];
                 inProgressQuerySnapshot.forEach((doc) => {
                     const taskData = doc.data();
@@ -412,7 +460,8 @@
                 inProgressListDataElements = [...tempinProgressElms];
 
 
-                const completedQuerySnapshot = await getDocs(collection(db, "completed"));
+                // const completedQuerySnapshot = await getDocs(collection(db, "completed"));
+                const completedQuerySnapshot = await getDocs(query(collection(db, "completed"), where("id", "==", projectCode)));
                 let tempCompletedElms = [];
                 completedQuerySnapshot.forEach((doc) => {
                     const taskData = doc.data();
@@ -508,7 +557,8 @@
                 // Add the task to the target collection
                 await addDoc(collection(db, targetCollection), {
                     task: taskData.task,
-                    priority: taskData.priority
+                    priority: taskData.priority,
+                    id: taskData.id
                 });
 
                 // Refresh the display of the todo list
@@ -561,9 +611,72 @@
             });
         });
 
+
+        // Reference to the select element
+        const newTaskCodeSelect = document.getElementById('new-task-code');
+
+        // Function to fetch document IDs from Firestore
+        async function fetchProjectDocumentIds() {
+            try {
+                const projectQuerySnapshot = await getDocs(collection(db, 'projects'));
+                const documentIds = projectQuerySnapshot.docs.map(doc => doc.id);
+                return documentIds;
+            } catch (error) {
+                console.error('Error fetching project document IDs:', error);
+                return [];
+            }
+        }
+
+        // Function to update select options with document IDs
+        async function updateSelectOptions() {
+            const documentIds = await fetchProjectDocumentIds();
+            newTaskCodeSelect.innerHTML = ''; // Clear existing options
+
+            documentIds.forEach(docId => {
+                const option = document.createElement('option');
+                option.value = docId;
+                option.textContent = docId;
+                newTaskCodeSelect.appendChild(option);
+            });
+        }
+
+        // Call the function to update select options
+        updateSelectOptions();
+
+        const newProjectForm = document.getElementById('new-project-form');
+        const newProjectInput = document.getElementById('new-project-input');
+        const newTasksForm = document.getElementById('new-tasks-form');
+
+        newProjectForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent the default form submission behavior
+
+            const projectText = newProjectInput.value.trim();
+
+            if (projectText === '') {
+                displayTodoList(); // Call displayTodoList if input is empty
+            } else {
+                try {
+                    // Add the project to Firestore
+                    await setDoc(doc(db, 'projects', projectText), {
+                        id: projectText
+                    });
+                    // Clear the input field after adding the project
+                    newProjectInput.value = '';
+                    updateSelectOptions();
+                } catch (error) {
+                    console.error("Error adding project to Firestore: ", error);
+                }
+            }
+        });
+
+        newTasksForm.addEventListener('submit', async (e) => {
+            e.preventDefault(); // Prevent the default form submission behavior
+            displayTodoList();
+        });
+
+
         // Call displayTodoList initially
         displayTodoList();
-
 
     </script>
 </body>
