@@ -41,6 +41,10 @@
     margin-right: 8px;
 }
 
+.badge-text {
+    font-size: 1rem;
+}
+
 .task .badge i{
     font-size: 1rem;
 }

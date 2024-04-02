@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyAj06OfnGYpMuuCkgfd8vdSqyJKeFhZFcU",
@@ -21,6 +21,9 @@ window.db = db;
 window.addDoc = addDoc;
 window.getDoc = getDoc;
 window.deleteDoc = deleteDoc;
+window.setDoc = setDoc;
+window.query = query;
+window.where = where;
 
 
 const tasks = document.querySelectorAll('.task');
@@ -39,7 +42,7 @@ tasks.forEach(task => {
     });
 });
 
-const columns = document.querySelectorAll('.col-4');
+const columns = document.querySelectorAll('.col-3');
 
 columns.forEach(column => {
     column.addEventListener('dragover', e => {
@@ -87,14 +90,14 @@ function addTask() {
     newTask.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center', 'task');
     newTask.draggable = true;
     newTask.innerHTML = `
-        ${taskText}
-        <span class="badge rounded-pill ${badgeColorClass}">
-            <i class="${iconClass}"></i>
-        </span>
-    `;
+                ${taskText}
+                <span class="badge rounded-pill ${badgeColorClass}">
+                    <i class="${iconClass}"></i>
+                </span>
+            `;
 
-    const todoList = document.getElementById('todo');
-    todoList.appendChild(newTask);
+    const backlogList = document.getElementById('backlog');
+    backlogList.appendChild(newTask);
 
     // Add event listeners for drag and drop
     addDragListeners(newTask);
@@ -113,12 +116,24 @@ newTaskForm.addEventListener('submit', async (e) => {
     // Get the task text and priority from the input fields
     const taskText = newTaskInput.value.trim();
     const taskPriority = newTaskPriority.value;
+    const projectCode = document.getElementById('new-task-code').value;
+
+    const backlogQuerySnapshot = await getDocs(query(collection(db, "backlog"), where("id", "==", projectCode)));
+    const todoQuerySnapshot = await getDocs(query(collection(db, "todo"), where("id", "==", projectCode)));
+    const inProgressQuerySnapshot = await getDocs(query(collection(db, "inprogress"), where("id", "==", projectCode)));
+    const completedQuerySnapshot = await getDocs(query(collection(db, "completed"), where("id", "==", projectCode)));
+    let count = backlogQuerySnapshot.size;
+    count += todoQuerySnapshot.size;
+    count += inProgressQuerySnapshot.size;
+    count += completedQuerySnapshot.size;
 
     // Add the task to Firestore
     try {
-        await addDoc(collection(db, "todo"), {
+        await addDoc(collection(db, "backlog"), {
             task: taskText,
-            priority: taskPriority
+            priority: taskPriority,
+            id: projectCode,
+            count: count + 1
         });
         // Clear the input field after adding the task
         newTaskInput.value = '';
@@ -141,10 +156,10 @@ function removeAllListeners(element) {
 
 function addDeleteListener(deleteButton, docId, collectionName) {
     deleteButton.addEventListener('click', async (event) => {
-        await console.log(docId);
-        await console.log(event.target.dataset);
-        await console.log(event.target);
-        document.getElementById('todo').innerHTML = '';
+        // await console.log(docId);
+        // await console.log(event.target.dataset);
+        // await console.log(event.target);
+        document.getElementById('backlog').innerHTML = '';
         try {
             // Delete the task document from Firestore
             await deleteDoc(doc(db, collectionName, docId));
@@ -174,6 +189,8 @@ function createTaskElement(taskData, docId, collectionName) {
     taskElement.classList.add('list-group-item', 'd-flex', 'justify-content-between', 'align-items-center', 'task');
     taskElement.setAttribute('data-docid', docId);
 
+    const projectCode = document.getElementById("new-task-code").value;
+
     let badgeColorClass = '';
     let priorityIcon = '';
 
@@ -196,17 +213,31 @@ function createTaskElement(taskData, docId, collectionName) {
     }
 
     taskElement.innerHTML = `
-<span>${taskData.task}</span>
-<div class="d-flex align-items-center">
-    <span class="badge ${badgeColorClass} rounded-pill mr-2">${priorityIcon}</span>
-    <button class="btn btn-outline-danger delete-btn" data-docid="${docId}"><i class="bi bi-trash-fill"></i></button>
-</div>
-`;
+        <span>${taskData.task}</span>
+        <div class="d-flex align-items-center">
+            <span class="badge bg-primary rounded-pill mr-2 badge-text">${taskData.count}</span>
+            <span class="badge ${badgeColorClass} rounded-pill mr-2">${priorityIcon}</span>
+            <button class="btn btn-outline-danger delete-btn" data-docid="${docId}"><i class="bi bi-trash-fill"></i></button>
+        </div>
+    `;
 
     const deleteButton = taskElement.querySelector('.delete-btn');
     addDeleteListener(deleteButton, docId, collectionName);
 
     return taskElement;
+}
+
+async function getSequenceNumber(projectCode) {
+    const backlogQuerySnapshot = await getDocs(query(collection(db, "backlog"), where("id", "==", projectCode)));
+    const todoQuerySnapshot = await getDocs(query(collection(db, "todo"), where("id", "==", projectCode)));
+    const inProgressQuerySnapshot = await getDocs(query(collection(db, "inprogress"), where("id", "==", projectCode)));
+    const completedQuerySnapshot = await getDocs(query(collection(db, "completed"), where("id", "==", projectCode)));
+    let count = backlogQuerySnapshot.size;
+    count += todoQuerySnapshot.size;
+    count += inProgressQuerySnapshot.size;
+    count += completedQuerySnapshot.size;
+    // console.log(count);
+    return count + 1;
 }
 
 // Function to add drag event listeners
@@ -225,11 +256,19 @@ function addDragListeners(task) {
     });
 }
 
+var backlogListDataElements = [];
 var todoListDataElements = [];
 var inProgressListDataElements = [];
 var completedListDataElements = [];
 
 function setTodoListElementsList() {
+
+    let backlogListElm = document.getElementById('backlog');
+    backlogListElm.innerHTML = '';
+    backlogListDataElements.forEach((taskElement) => {
+        backlogListElm.appendChild(taskElement);
+    });
+
     let todoListElm = document.getElementById('todo');
     todoListElm.innerHTML = '';
     todoListDataElements.forEach((taskElement) => {
@@ -251,11 +290,18 @@ function setTodoListElementsList() {
 
 
 async function displayTodoList() {
+
+    const projectCode = document.getElementById('new-task-code').value;
+    // console.log(projectCode);
+
     // debugger;
+    const backlogList = document.getElementById('backlog');
     const todoList = document.getElementById('todo');
     const inProgressList = document.getElementById('inprogress');
     const completedList = document.getElementById('completed');
 
+    // // Clear previous backlog list items
+    backlogList.innerHTML = '';
     // // Clear previous todo list items
     todoList.innerHTML = '';
     // // Clear previous in progress list items
@@ -264,7 +310,19 @@ async function displayTodoList() {
     completedList.innerHTML = '';
 
     try {
-        const todoQuerySnapshot = await getDocs(collection(db, "todo"));
+        // const backlogQuerySnapshot = await getDocs(collection(db, "backlog"));
+        const backlogQuerySnapshot = await getDocs(query(collection(db, "backlog"), where("id", "==", projectCode)));
+        // console.log(todoList.children);
+        let tempBacklogElms = [];
+        backlogQuerySnapshot.forEach((doc) => {
+            const taskData = doc.data();
+            const taskElement = createTaskElement(taskData, doc.id, "backlog");
+            tempBacklogElms.push(taskElement);
+        });
+        backlogListDataElements = [...tempBacklogElms];
+
+        // const todoQuerySnapshot = await getDocs(collection(db, "todo"));
+        const todoQuerySnapshot = await getDocs(query(collection(db, "todo"), where("id", "==", projectCode)));
         // console.log(todoList.children);
         let tempTodoElms = [];
         todoQuerySnapshot.forEach((doc) => {
@@ -275,7 +333,8 @@ async function displayTodoList() {
         todoListDataElements = [...tempTodoElms];
 
 
-        const inProgressQuerySnapshot = await getDocs(collection(db, "inprogress"));
+        // const inProgressQuerySnapshot = await getDocs(collection(db, "inprogress"));
+        const inProgressQuerySnapshot = await getDocs(query(collection(db, "inprogress"), where("id", "==", projectCode)));
         let tempinProgressElms = [];
         inProgressQuerySnapshot.forEach((doc) => {
             const taskData = doc.data();
@@ -287,7 +346,8 @@ async function displayTodoList() {
         inProgressListDataElements = [...tempinProgressElms];
 
 
-        const completedQuerySnapshot = await getDocs(collection(db, "completed"));
+        // const completedQuerySnapshot = await getDocs(collection(db, "completed"));
+        const completedQuerySnapshot = await getDocs(query(collection(db, "completed"), where("id", "==", projectCode)));
         let tempCompletedElms = [];
         completedQuerySnapshot.forEach((doc) => {
             const taskData = doc.data();
@@ -328,6 +388,7 @@ function addDeleteListenersToTasks() {
 
 // --------------------------------------------------
 
+const BACKLOG_COLLECTION = 'backlog';
 const TODO_COLLECTION = 'todo';
 const IN_PROGRESS_COLLECTION = 'inprogress';
 const COMPLETED_COLLECTION = 'completed';
@@ -382,7 +443,9 @@ async function handleDrop(event, targetCollection) {
         // Add the task to the target collection
         await addDoc(collection(db, targetCollection), {
             task: taskData.task,
-            priority: taskData.priority
+            priority: taskData.priority,
+            id: taskData.id,
+            count: taskData.count
         });
 
         // Refresh the display of the todo list
@@ -410,11 +473,11 @@ function getPriorityIconClass(priority) {
 document.addEventListener('click', async event => {
     if (event.target.classList.contains('delete-btn')) {
         const docId = event.target.dataset.docid;
-        await console.log(docId);
-        await console.log(event.target.dataset);
-        await console.log(event.target);
+        // await console.log(docId);
+        // await console.log(event.target.dataset);
+        // await console.log(event.target);
         document.getElementById('todo').innerHTML = '';
-        console.log(document.getElementById('todo'));
+        // console.log(document.getElementById('todo'));
 
         const collectionName = event.target.closest('.list-group').id;
         try {
@@ -435,6 +498,69 @@ document.querySelectorAll('.list-group').forEach(listGroup => {
     });
 });
 
+
+// Reference to the select element
+const newTaskCodeSelect = document.getElementById('new-task-code');
+
+// Function to fetch document IDs from Firestore
+async function fetchProjectDocumentIds() {
+    try {
+        const projectQuerySnapshot = await getDocs(collection(db, 'projects'));
+        const documentIds = projectQuerySnapshot.docs.map(doc => doc.id);
+        return documentIds;
+    } catch (error) {
+        console.error('Error fetching project document IDs:', error);
+        return [];
+    }
+}
+
+// Function to update select options with document IDs
+async function updateSelectOptions() {
+    const documentIds = await fetchProjectDocumentIds();
+    newTaskCodeSelect.innerHTML = ''; // Clear existing options
+
+    documentIds.forEach(docId => {
+        const option = document.createElement('option');
+        option.value = docId;
+        option.textContent = docId;
+        newTaskCodeSelect.appendChild(option);
+    });
+}
+
+// Call the function to update select options
+updateSelectOptions();
+
+const newProjectForm = document.getElementById('new-project-form');
+const newProjectInput = document.getElementById('new-project-input');
+const newTasksForm = document.getElementById('new-tasks-form');
+
+newProjectForm.addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent the default form submission behavior
+
+    const projectText = newProjectInput.value.trim();
+
+    if (projectText === '') {
+        displayTodoList(); // Call displayTodoList if input is empty
+    } else {
+        try {
+            // Add the project to Firestore
+            await setDoc(doc(db, 'projects', projectText), {
+                id: projectText
+            });
+            // Clear the input field after adding the project
+            newProjectInput.value = '';
+            updateSelectOptions();
+        } catch (error) {
+            console.error("Error adding project to Firestore: ", error);
+        }
+    }
+});
+
+newTasksForm.addEventListener('submit', async (e) => {
+    e.preventDefault(); // Prevent the default form submission behavior
+    displayTodoList();
+});
+
+
 // Call displayTodoList initially
 displayTodoList();
-
