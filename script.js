@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
+import { getFirestore, collection, getDocs, addDoc, doc, updateDoc, deleteDoc, getDoc, setDoc, query, where, writeBatch } from 'https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyAj06OfnGYpMuuCkgfd8vdSqyJKeFhZFcU",
@@ -533,6 +533,7 @@ updateSelectOptions();
 const newProjectForm = document.getElementById('new-project-form');
 const newProjectInput = document.getElementById('new-project-input');
 const newTasksForm = document.getElementById('new-tasks-form');
+const deleteProject = document.getElementById('deleteProject');
 
 newProjectForm.addEventListener('submit', async (e) => {
     e.preventDefault(); // Prevent the default form submission behavior
@@ -548,6 +549,7 @@ newProjectForm.addEventListener('submit', async (e) => {
                 id: projectText
             });
             // Clear the input field after adding the project
+            confirm("Project added successfully!");
             newProjectInput.value = '';
             updateSelectOptions();
         } catch (error) {
@@ -561,6 +563,55 @@ newTasksForm.addEventListener('submit', async (e) => {
     displayTodoList();
 });
 
+const deleteProjectBtn = document.getElementById('deleteProject');
+const confirmDeleteBtn = document.getElementById('confirmDelete');
+
+deleteProjectBtn.addEventListener('click', async (e) => {
+    // Show the custom confirmation modal
+    const confirmationModal = new bootstrap.Modal(document.getElementById('myModal'));
+    confirmationModal.show();
+
+    confirmDeleteBtn.addEventListener('click', async () => {
+        const projectId = document.getElementById('new-task-code').value;
+        try {
+            await deleteDoc(doc(db, 'projects', projectId));
+            const backlogSnapshot = await getDocs(query(collection(db, 'backlog'), where('id', '==', projectId)));
+            const backlogBatch = writeBatch(db);
+            backlogSnapshot.forEach((doc) => {
+                backlogBatch.delete(doc.ref);
+            });
+            await backlogBatch.commit();
+
+            const todoSnapshot = await getDocs(query(collection(db, 'todo'), where('id', '==', projectId)));
+            const todoBatch = writeBatch(db);
+            todoSnapshot.forEach((doc) => {
+                todoBatch.delete(doc.ref);
+            });
+            await todoBatch.commit();
+
+            const inprogressSnapshot = await getDocs(query(collection(db, 'inprogress'), where('id', '==', projectId)));
+            const inprogressBatch = writeBatch(db);
+            inprogressSnapshot.forEach((doc) => {
+                inprogressBatch.delete(doc.ref);
+            });
+            await inprogressBatch.commit();
+
+            const completedSnapshot = await getDocs(query(collection(db, 'completed'), where('id', '==', projectId)));
+            const completedBatch = writeBatch(db);
+            completedSnapshot.forEach((doc) => {
+                completedBatch.delete(doc.ref);
+            });
+            await completedBatch.commit();
+
+            await updateSelectOptions();
+            displayTodoList();
+        } catch (error) {
+            console.error('Error deleting project:', error);
+        }
+        // Hide the modal after confirmation
+        confirmationModal.hide();
+    });
+});
 
 // Call displayTodoList initially
 displayTodoList();
